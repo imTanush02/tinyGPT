@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
 import tiktoken
 
@@ -55,19 +56,19 @@ def get_batch(split):
 
 
 xb, yb = get_batch('train')
-print('inputs:')
-print(xb.shape)
-print(xb)
-print('targets:')
-print(yb.shape)
-print(yb)
+# print('inputs:')
+# print(xb.shape)
+# print(xb)
+# print('targets:')
+# print(yb.shape)
+# print(yb)
+# print(vocab_size)
 
-
-for b in range(batch_size):
-    for t in range(block_size):
-        context = xb[b, :t+1]
-        target = yb[b, t]
-        print(f"when input is {context.tolist()} the target: {target}")   
+# for b in range(batch_size):
+#     for t in range(block_size):
+#         context = xb[b, :t+1]
+#         target = yb[b, t]
+#         print(f"when input is {context.tolist()} the target: {target}")   
 
 class BigramLanguageModel(nn.Module):
     def __init__(self, vocab_size):
@@ -78,10 +79,34 @@ class BigramLanguageModel(nn.Module):
     def forward(self, idx, targets=None):
         # idx and targets are both (B,T) tensor of integers
         logits = self.token_embedding_table(idx) # (B,T,C)
-        return logits
 
+        if targets is None:
+            loss = None
+        else:
+            B, T, C = logits.shape
+            logits = logits.view(B*T, C)
+            targets = targets.view(B*T)
+            loss = F.cross_entropy(logits, targets)
 
+        return logits, loss
+
+    def generate(self, idx, max_new_tokens):
+        # idx is (B, T) array of indices in the current context
+        for _ in range(max_new_tokens):
+            # get the predictions
+            logits, loss = self(idx)
+            # focus only on the last time step
+            logits = logits[:, -1, :] # becomes (B, C)
+            # apply softmax to get probabilities
+            probs = F.softmax(logits, dim=-1) # (B, C)
+            # sample from the distribution
+            idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
+             # append sampled index to the running sequence
+            idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
+        return idx
 
 m = BigramLanguageModel(vocab_size)
-out = m(xb, yb)
-print(out.shape)
+logits, loss = m(xb, yb)
+print(logits.shape)
+print(loss)
+print(decode(m.generate(idx = torch.zeros((1, 1), dtype=torch.long), max_new_tokens=100)[0].tolist()))
