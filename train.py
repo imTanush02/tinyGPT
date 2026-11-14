@@ -107,6 +107,25 @@ class BigramLanguageModel(nn.Module):
 
 m = BigramLanguageModel(vocab_size)
 logits, loss = m(xb, yb)
-print(logits.shape)
-print(loss)
-print(decode(m.generate(idx = torch.zeros((1, 1), dtype=torch.long), max_new_tokens=100)[0].tolist()))
+# print(logits.shape)
+# print(loss)
+# print(decode(m.generate(idx = torch.zeros((1, 1), dtype=torch.long), max_new_tokens=100)[0].tolist()))
+
+#optimizer 
+optimizer = torch.optim.AdamW(m.parameters(), lr=1e-3)
+
+batch_size = 32
+for steps in range(10000): # increase number of steps for good results...
+
+    # sample a batch of data
+    xb, yb = get_batch('train')
+
+    # evaluate the loss
+    logits, loss = m(xb, yb)
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
+
+print(loss.item())
+
+print(decode(m.generate(idx = torch.zeros((1, 1), dtype=torch.long), max_new_tokens=600)[0].tolist()))
